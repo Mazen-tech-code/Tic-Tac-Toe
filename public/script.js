@@ -1,39 +1,39 @@
+const socket = io();  // الاتصال بـ Socket.io
 const cells = document.querySelectorAll('.cell');
 const statusText = document.getElementById('status');
 let currentPlayer = 'X';
-let board = Array(9).fill(null);
+let gameOver = false;
 
-function checkWinner() {
-  const winPatterns = [
-    [0, 1, 2], [3, 4, 5], [6, 7, 8], // Rows
-    [0, 3, 6], [1, 4, 7], [2, 5, 8], // Columns
-    [0, 4, 8], [2, 4, 6]             // Diagonals
-  ];
-
-  for (const pattern of winPatterns) {
-    const [a, b, c] = pattern;
-    if (board[a] && board[a] === board[b] && board[a] === board[c]) {
-      return board[a];
-    }
-  }
-  return board.includes(null) ? null : 'Draw';
+function renderBoard(gameState) {
+  gameState.forEach((mark, index) => {
+    const cell = cells[index];
+    cell.textContent = mark || '';
+    cell.classList.toggle('taken', mark);
+  });
 }
 
 function handleClick(event) {
+  if (gameOver) return;
+
   const index = event.target.dataset.index;
-  if (!board[index]) {
-    board[index] = currentPlayer;
-    event.target.textContent = currentPlayer;
-    event.target.classList.add('taken');
-    const winner = checkWinner();
-    if (winner) {
-      statusText.textContent = winner === 'Draw' ? "It's a draw!" : `${winner} wins!`;
-      cells.forEach(cell => cell.removeEventListener('click', handleClick));
-    } else {
-      currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
-      statusText.textContent = `Player ${currentPlayer}'s turn`;
-    }
+  if (!gameState[index]) {
+    socket.emit('playerMove', index, currentPlayer);  // إرسال التحرك إلى السيرفر
+    currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+    statusText.textContent = `Player ${currentPlayer}'s turn`;
   }
 }
+
+socket.on('gameState', (gameState) => {
+  renderBoard(gameState);
+});
+
+socket.on('gameOver', (winner) => {
+  gameOver = true;
+  if (winner === 'Draw') {
+    statusText.textContent = "It's a draw!";
+  } else {
+    statusText.textContent = `${winner} wins!`;
+  }
+});
 
 cells.forEach(cell => cell.addEventListener('click', handleClick));
